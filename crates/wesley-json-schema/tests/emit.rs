@@ -231,3 +231,49 @@ fn an_input_object_rejects_undeclared_fields_but_an_output_object_does_not() {
         .expect("compiles")
         .is_valid(&json!({"aa": 1})));
 }
+
+#[test]
+fn an_input_id_accepts_an_integer_but_an_output_id_does_not() {
+    let ir =
+        wesley_core::lower_schema_sdl("input F { id: ID! } type T { id: ID! }").expect("lowers");
+    let docs = emit_ir(&ir, &options()).expect("emits");
+    let input = docs
+        .iter()
+        .find(|d| d.file_name == "F.schema.json")
+        .expect("F");
+    let output = docs
+        .iter()
+        .find(|d| d.file_name == "T.schema.json")
+        .expect("T");
+    let i = jsonschema::validator_for(&input.value).expect("compiles");
+    assert!(i.is_valid(&json!({"id": "123"})) && i.is_valid(&json!({"id": 123})));
+    assert!(!i.is_valid(&json!({"id": 1.5})));
+    assert!(!jsonschema::validator_for(&output.value)
+        .expect("compiles")
+        .is_valid(&json!({"id": 123})));
+}
+
+#[test]
+fn an_input_list_accepts_a_single_value_at_every_level() {
+    let ir = wesley_core::lower_schema_sdl(
+        "input F { tags: [String!]! grid: [[Int!]!]! } type T { tags: [String!]! }",
+    )
+    .expect("lowers");
+    let docs = emit_ir(&ir, &options()).expect("emits");
+    let input = docs
+        .iter()
+        .find(|d| d.file_name == "F.schema.json")
+        .expect("F");
+    let i = jsonschema::validator_for(&input.value).expect("compiles");
+    assert!(i.is_valid(&json!({"tags": "a", "grid": 1})));
+    assert!(i.is_valid(&json!({"tags": ["a"], "grid": [1, 2, 3]})));
+    assert!(i.is_valid(&json!({"tags": ["a"], "grid": [[1], [2]]})));
+    assert!(!i.is_valid(&json!({"tags": 1, "grid": 1})));
+    let output = docs
+        .iter()
+        .find(|d| d.file_name == "T.schema.json")
+        .expect("T");
+    assert!(!jsonschema::validator_for(&output.value)
+        .expect("compiles")
+        .is_valid(&json!({"tags": "a"})));
+}

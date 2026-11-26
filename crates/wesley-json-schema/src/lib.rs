@@ -127,7 +127,8 @@ fn document(ir: &WesleyIR, t: &TypeDefinition, options: &Options) -> Result<Valu
     }
     let mut properties = Map::new();
     for field in &t.fields {
-        let mut schema = type_schema(ir, options, &t.name, &field.name, &field.r#type)?;
+        let input = t.kind == TypeKind::InputObject;
+        let mut schema = type_schema(ir, options, &t.name, &field.name, &field.r#type, input)?;
         if let (Some(description), Value::Object(map)) = (&field.description, &mut schema) {
             map.insert("description".into(), json!(description));
         }
@@ -150,6 +151,7 @@ fn type_schema(
     owner: &str,
     field: &str,
     r: &TypeReference,
+    input: bool,
 ) -> Result<Value, Error> {
     // (nullable) for each level, outermost first, ending with the leaf.
     let mut levels: Vec<bool> = Vec::new();
@@ -164,12 +166,26 @@ fn type_schema(
     }
     let leaf_nullable = levels.pop().unwrap_or(true);
     let mut schema = nullable(
-        named_schema(ir, options, owner, field, &r.base)?,
+        named_schema(ir, options, owner, field, &r.base, input)?,
         leaf_nullable,
     );
+    let mut inner_nullable = leaf_nullable;
     for list_nullable in levels.into_iter().rev() {
-        schema = json!({"type": "array", "items": schema});
+        let array = json!({"type": "array", "items": schema});
+        schema = if input {
+            // GraphQL coerces a single input value to a one-item list, at every level; a null
+            // is never coerced, since it is the list's own null or an error.
+            let single = if inner_nullable {
+                json!({"allOf": [array["items"].clone(), {"not": {"type": "null"}}]})
+            } else {
+                array["items"].clone()
+            };
+            json!({"anyOf": [array, single]})
+        } else {
+            array
+        };
         schema = nullable(schema, list_nullable);
+        inner_nullable = list_nullable;
     }
     Ok(schema)
 }
@@ -206,8 +222,11 @@ fn named_schema(
     owner: &str,
     field: &str,
     name: &str,
+    input: bool,
 ) -> Result<Value, Error> {
     match name {
+        // GraphQL coerces an integer input to an ID; an ID it returns is a string.
+        "ID" if input => return Ok(json!({"type": ["string", "integer"]})),
         "String" | "ID" => return Ok(json!({"type": "string"})),
         // GraphQL `Int` is a signed 32-bit integer; JSON Schema `integer` alone is unbounded.
         "Int" => return Ok(json!({"type": "integer", "minimum": i32::MIN, "maximum": i32::MAX})),
