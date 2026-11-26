@@ -169,23 +169,19 @@ fn type_schema(
         named_schema(ir, options, owner, field, &r.base, input)?,
         leaf_nullable,
     );
-    let mut inner_nullable = leaf_nullable;
     for list_nullable in levels.into_iter().rev() {
         let array = json!({"type": "array", "items": schema});
         schema = if input {
-            // GraphQL coerces a single input value to a one-item list, at every level; a null
-            // is never coerced, since it is the list's own null or an error.
-            let single = if inner_nullable {
-                json!({"allOf": [array["items"].clone(), {"not": {"type": "null"}}]})
-            } else {
-                array["items"].clone()
-            };
+            // GraphQL coerces a single input value to a one-item list, at every level. Neither a
+            // null (the list's own null, or an error) nor an array (a list at another level) is
+            // ever coerced.
+            let single =
+                json!({"allOf": [array["items"].clone(), {"not": {"type": ["null", "array"]}}]});
             json!({"anyOf": [array, single]})
         } else {
             array
         };
         schema = nullable(schema, list_nullable);
-        inner_nullable = list_nullable;
     }
     Ok(schema)
 }

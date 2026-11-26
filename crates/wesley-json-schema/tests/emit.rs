@@ -277,3 +277,20 @@ fn an_input_list_accepts_a_single_value_at_every_level() {
         .expect("compiles")
         .is_valid(&json!({"tags": "a"})));
 }
+
+#[test]
+fn an_array_is_never_taken_as_a_single_value_of_a_list() {
+    let ir = wesley_core::lower_schema_sdl("scalar JSON\ninput F { xs: [[Int]!]! js: [JSON!]! }")
+        .expect("lowers");
+    let docs = emit_ir(&ir, &options()).expect("emits");
+    let v = jsonschema::validator_for(&docs[0].value).expect("compiles");
+    assert!(v.is_valid(&json!({"xs": [[1]], "js": [1]})));
+    assert!(
+        !v.is_valid(&json!({"xs": [null], "js": [1]})),
+        "a null inner list is not coerced"
+    );
+    assert!(
+        !v.is_valid(&json!({"xs": [[1]], "js": [null]})),
+        "a null item of a non-null scalar list"
+    );
+}
