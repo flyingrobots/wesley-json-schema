@@ -191,3 +191,43 @@ fn int_is_bounded_to_graphqls_signed_32_bit_range() {
     assert!(!v.is_valid(&json!({"n": 2_147_483_648_i64})));
     assert!(!v.is_valid(&json!({"n": -2_147_483_649_i64})));
 }
+
+#[test]
+fn an_input_field_with_a_default_may_be_omitted_but_not_null() {
+    let ir = wesley_core::lower_schema_sdl("input Filter { limit: Int! = 10 kind: String! }")
+        .expect("lowers");
+    let docs = emit_ir(&ir, &options()).expect("emits");
+    let v = jsonschema::validator_for(&docs[0].value).expect("compiles");
+    assert!(
+        v.is_valid(&json!({"kind": "x"})),
+        "a defaulted field may be omitted"
+    );
+    assert!(
+        !v.is_valid(&json!({"kind": "x", "limit": null})),
+        "but not null"
+    );
+    assert!(
+        !v.is_valid(&json!({"limit": 1})),
+        "a field without a default stays required"
+    );
+}
+
+#[test]
+fn an_input_object_rejects_undeclared_fields_but_an_output_object_does_not() {
+    let ir = wesley_core::lower_schema_sdl("input F { a: Int } type T { a: Int }").expect("lowers");
+    let docs = emit_ir(&ir, &options()).expect("emits");
+    let input = docs
+        .iter()
+        .find(|d| d.file_name == "F.schema.json")
+        .expect("F");
+    let output = docs
+        .iter()
+        .find(|d| d.file_name == "T.schema.json")
+        .expect("T");
+    assert!(!jsonschema::validator_for(&input.value)
+        .expect("compiles")
+        .is_valid(&json!({"aa": 1})));
+    assert!(jsonschema::validator_for(&output.value)
+        .expect("compiles")
+        .is_valid(&json!({"aa": 1})));
+}

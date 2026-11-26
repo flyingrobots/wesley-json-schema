@@ -114,11 +114,16 @@ fn document(ir: &WesleyIR, t: &TypeDefinition, options: &Options) -> Result<Valu
     let required: Vec<&str> = t
         .fields
         .iter()
-        .filter(|f| !f.r#type.nullable)
+        // An input field with a default may be omitted (GraphQL applies the default).
+        .filter(|f| !f.r#type.nullable && f.default_value.is_none())
         .map(|f| f.name.as_str())
         .collect();
     if !required.is_empty() {
         doc.insert("required".into(), json!(required));
+    }
+    if t.kind == TypeKind::InputObject {
+        // GraphQL rejects an input field the type does not declare; an output object may grow.
+        doc.insert("additionalProperties".into(), json!(false));
     }
     let mut properties = Map::new();
     for field in &t.fields {

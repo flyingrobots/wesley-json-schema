@@ -3,6 +3,7 @@
   "$id": "https://example.test/schemas/UserFilter",
   "title": "UserFilter",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "role": {
       "anyOf": [
