@@ -171,7 +171,15 @@ fn type_schema(
 
 fn nullable(schema: Value, is_nullable: bool) -> Value {
     let accepts_anything = schema.as_object().is_some_and(Map::is_empty);
-    if !is_nullable || accepts_anything {
+    if accepts_anything {
+        // A custom scalar admits any value; a non-null one admits any value but null.
+        return if is_nullable {
+            schema
+        } else {
+            json!({"not": {"type": "null"}})
+        };
+    }
+    if !is_nullable {
         return schema;
     }
     // A union is already an `anyOf`; null joins its branches rather than nesting it.
@@ -196,7 +204,8 @@ fn named_schema(
 ) -> Result<Value, Error> {
     match name {
         "String" | "ID" => return Ok(json!({"type": "string"})),
-        "Int" => return Ok(json!({"type": "integer"})),
+        // GraphQL `Int` is a signed 32-bit integer; JSON Schema `integer` alone is unbounded.
+        "Int" => return Ok(json!({"type": "integer", "minimum": i32::MIN, "maximum": i32::MAX})),
         "Float" => return Ok(json!({"type": "number"})),
         "Boolean" => return Ok(json!({"type": "boolean"})),
         _ => {}

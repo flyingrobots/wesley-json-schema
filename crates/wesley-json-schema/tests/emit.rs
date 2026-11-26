@@ -167,3 +167,27 @@ impl jsonschema::Retrieve for Documents {
             .ok_or_else(|| format!("no document {}", uri.as_str()).into())
     }
 }
+
+#[test]
+fn a_non_null_custom_scalar_rejects_null() {
+    let ir = wesley_core::lower_schema_sdl("scalar JSON\ntype A { payload: JSON! maybe: JSON }")
+        .expect("lowers");
+    let docs = emit_ir(&ir, &options()).expect("emits");
+    let v = jsonschema::validator_for(&docs[0].value).expect("compiles");
+    assert!(
+        !v.is_valid(&json!({"payload": null})),
+        "null is not a value of a non-null scalar"
+    );
+    assert!(v.is_valid(&json!({"payload": {"x": 1}, "maybe": null})));
+}
+
+#[test]
+fn int_is_bounded_to_graphqls_signed_32_bit_range() {
+    let ir = wesley_core::lower_schema_sdl("type A { n: Int! }").expect("lowers");
+    let docs = emit_ir(&ir, &options()).expect("emits");
+    let v = jsonschema::validator_for(&docs[0].value).expect("compiles");
+    assert!(v.is_valid(&json!({"n": 2_147_483_647})));
+    assert!(v.is_valid(&json!({"n": -2_147_483_648_i64})));
+    assert!(!v.is_valid(&json!({"n": 2_147_483_648_i64})));
+    assert!(!v.is_valid(&json!({"n": -2_147_483_649_i64})));
+}
