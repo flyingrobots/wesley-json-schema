@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.test/schemas/UserFilter",
+  "title": "UserFilter",
+  "type": "object",
+  "properties": {
+    "role": {
+      "anyOf": [
+        {
+          "enum": [
+            "ADMIN",
+            "MEMBER"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "minAge": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

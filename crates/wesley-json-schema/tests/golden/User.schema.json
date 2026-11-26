@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.test/schemas/User",
+  "title": "User",
+  "description": "A user of the system.",
+  "type": "object",
+  "required": [
+    "id",
+    "age",
+    "active",
+    "role",
+    "tags"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Display name, if the user set one."
+    },
+    "age": {
+      "type": "integer"
+    },
+    "score": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "role": {
+      "enum": [
+        "ADMIN",
+        "MEMBER"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "friends": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "https://example.test/schemas/User"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "meta": {},
+    "best": {
+      "anyOf": [
+        {
+          "$ref": "https://example.test/schemas/User"
+        },
+        {
+          "$ref": "https://example.test/schemas/Page"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
