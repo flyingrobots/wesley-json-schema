@@ -1,0 +1,28 @@
+[package]
+name = "wesley-json-schema"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "JSON Schema 2020-12 target for Wesley IR: canonical documents, and plain-GraphQL schemas"
+license = "Apache-2.0"
+readme = "../../README.md"
+repository = "https://github.com/flyingrobots/wesley-json-schema"
+homepage = "https://github.com/flyingrobots/wesley-json-schema#readme"
+keywords = ["graphql", "json-schema", "codegen", "wesley"]
+categories = ["compilers"]
+
+[lib]
+name = "wesley_json_schema"
+
+[[bin]]
+name = "wesley-json-schema"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { version = "1.0", features = ["preserve_order"] }
+thiserror = "2.0"
+wesley-core = { version = "=0.3.0-alpha.4", default-features = false }
+
+[dev-dependencies]
+jsonschema = { version = "0.63", default-features = false }
+pretty_assertions = "1.4"

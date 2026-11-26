@@ -1,0 +1,32 @@
+"A user of the system."
+type User {
+  id: ID!
+  "Display name, if the user set one."
+  name: String
+  age: Int!
+  score: Float
+  active: Boolean!
+  role: Role!
+  tags: [String!]!
+  friends: [User]
+  meta: JSON
+  best: SearchResult
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+union SearchResult = User | Page
+
+type Page {
+  url: String! @audited(level: 2)
+}
+
+input UserFilter {
+  role: Role
+  minAge: Int
+}
+
+scalar JSON
