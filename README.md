@@ -10,7 +10,7 @@ Not started. This repository holds the plan and its rules; the first code waits 
 
 ## Where it comes from
 
-The plan is flyingrobots/wesley#856, transferred here. Its first consumer is Parley, whose 17 hand-written message schemas become generated output once this target can reproduce them as JSON values (flyingrobots/parley#119).
+The plan is issue #1 (transferred from flyingrobots/wesley#856). Its first consumer is Parley, whose 17 hand-written message schemas become generated output once this target can reproduce them as JSON values (flyingrobots/parley#119).
 
 ## How it generates code
 
