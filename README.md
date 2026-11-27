@@ -39,6 +39,10 @@ Rules every change keeps:
 - **Deterministic to the byte.** The same IR and options give the same bytes on every machine. CI runs the generator twice and compares.
 - **The IR is the only input.** The target reads the published IR (flyingrobots/wesley#881) and never depends on Wesley's internals.
 
+## Releasing
+
+The crate is published to crates.io from an annotated tag by the release workflow, after the owner approves it. [RELEASING.md](https://github.com/flyingrobots/wesley-json-schema/blob/main/RELEASING.md) gives the procedure.
+
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

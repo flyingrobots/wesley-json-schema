@@ -1,6 +1,6 @@
 [package]
 name = "wesley-json-schema"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2021"
 rust-version = "1.85"
 description = "JSON Schema 2020-12 target for Wesley IR: canonical documents, and plain-GraphQL schemas"
@@ -8,8 +8,9 @@ license = "Apache-2.0"
 readme = "../../README.md"
 repository = "https://github.com/flyingrobots/wesley-json-schema"
 homepage = "https://github.com/flyingrobots/wesley-json-schema#readme"
+documentation = "https://docs.rs/wesley-json-schema"
 keywords = ["graphql", "json-schema", "codegen", "wesley"]
-categories = ["compilers"]
+categories = ["compilers", "development-tools", "command-line-utilities"]
 
 [lib]
 name = "wesley_json_schema"

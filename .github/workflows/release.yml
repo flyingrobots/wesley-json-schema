@@ -1,0 +1,239 @@
+name: release
+
+# Publishes wesley-json-schema to crates.io from an annotated v* tag on main.
+# RELEASING.md describes the procedure. The publish job runs in the crates-io
+# environment, which waits for the owner's approval.
+
+on:
+  push:
+    tags: ['v*']
+  # A dispatch must name a tag as its ref (gh workflow run release.yml --ref vX.Y.Z);
+  # the gate refuses any other ref.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CRATE: wesley-json-schema
+  CARGO_TERM_COLOR: always
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      # Every later job needs this one, so a dispatch from a branch stops here.
+      - name: Refuse a ref that is not a tag
+        if: github.ref_type != 'tag'
+        run: |
+          echo "release must run from a release tag, not ${GITHUB_REF}."
+          exit 1
+
+      - name: Checkout the tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse a lightweight tag, or one not on main
+        run: |
+          set -euo pipefail
+          # A checkout of a tag ref can leave refs/tags/<tag> pointing straight at
+          # the commit. Fetch the real tag object before asking what it is.
+          git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          git fetch origin main
+          kind="$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")"
+          if [ "$kind" != "tag" ]; then
+            echo "${GITHUB_REF_NAME} is a lightweight tag (${kind}); release from an annotated tag (git tag -a)."
+            exit 1
+          fi
+          tag_commit="$(git rev-parse "refs/tags/${GITHUB_REF_NAME}^{commit}")"
+          head_commit="$(git rev-parse HEAD)"
+          if [ "$tag_commit" != "$head_commit" ]; then
+            echo "${GITHUB_REF_NAME} points at ${tag_commit}, but the checkout is ${head_commit}."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
+            echo "${GITHUB_REF_NAME} (${tag_commit}) is not on origin/main."
+            exit 1
+          fi
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Refuse a tag that differs from the crate version
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --format-version 1 --no-deps --locked \
+            | jq -r --arg crate "$CRATE" '.packages[] | select(.name == $crate) | .version')"
+          if [ -z "$version" ]; then
+            echo "Could not read the version of ${CRATE} from cargo metadata."
+            exit 1
+          fi
+          if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match ${CRATE} version ${version}."
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse a version the changelog does not record
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! awk -v heading="## [${VERSION}]" 'index($0, heading) == 1 { found = 1 } END { exit !found }' CHANGELOG.md; then
+            echo "CHANGELOG.md has no '## [${VERSION}]' heading."
+            exit 1
+          fi
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --all-targets --locked
+      - run: cargo publish --dry-run --locked -p "$CRATE"
+
+  publish:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: crates-io
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout the tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+
+      # A re-run after a successful upload finds the version already published
+      # and skips the upload rather than failing on it.
+      - name: Check whether the version is already published
+        id: published
+        working-directory: ${{ runner.temp }}
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: |
+          if cargo info "${CRATE}@${VERSION}" --registry crates-io; then
+            echo "${CRATE} ${VERSION} is already on crates.io; skipping the upload."
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to crates.io
+        if: steps.published.outputs.already != 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --locked -p "$CRATE"
+
+  verify:
+    needs: [gate, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+
+      - name: Wait for the version on crates.io
+        working-directory: ${{ runner.temp }}
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: |
+          set -u
+          for attempt in $(seq 1 20); do
+            if cargo info "${CRATE}@${VERSION}" --registry crates-io; then
+              exit 0
+            fi
+            echo "Attempt ${attempt}/20: ${CRATE} ${VERSION} is not on crates.io yet."
+            sleep 15
+          done
+          echo "${CRATE} ${VERSION} did not appear on crates.io."
+          exit 1
+
+      - name: Install the published crate and run it
+        working-directory: ${{ runner.temp }}
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          cargo install "$CRATE" --version "=${VERSION}" --locked --root "${RUNNER_TEMP}/install"
+          "${RUNNER_TEMP}/install/bin/wesley-json-schema" --help
+
+  github-release:
+    needs: [gate, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout the tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Create the GitHub release from the changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists."
+            exit 0
+          fi
+          notes="${RUNNER_TEMP}/notes.md"
+          awk -v heading="## [${VERSION}]" '
+            index($0, heading) == 1 { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > "$notes"
+          if [ ! -s "$notes" ]; then
+            echo "CHANGELOG.md has no notes under '## [${VERSION}]'."
+            exit 1
+          fi
+          prerelease=()
+          case "$VERSION" in
+            *-*) prerelease=(--prerelease) ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "${CRATE} ${VERSION}" \
+            --notes-file "$notes" \
+            "${prerelease[@]}"
