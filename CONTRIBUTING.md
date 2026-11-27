@@ -14,6 +14,7 @@ Every pull request names a GitHub issue. If there is no issue for the change, op
 - Build output as a syntax tree and print it with the printer named in the [README](README.md). A pull request that writes generated code as strings is not merged.
 - A new golden file is checked by the real toolchain in CI, as the README says.
 - Commit with a new commit; do not amend, squash or rebase published history.
+- Releases follow [RELEASING.md](RELEASING.md).
 
 ## Licensing
 
