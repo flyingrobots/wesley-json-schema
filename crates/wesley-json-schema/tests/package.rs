@@ -1,47 +1,14 @@
 //! The published crate carries the README, the license and the NOTICE that Apache-2.0 requires
-//! every redistribution to keep, and its copies are the repository's own, byte for byte.
+//! every redistribution to keep. `LICENSE` and `NOTICE` in the crate are links to the
+//! repository's own files, which `cargo package` follows.
 
-use std::path::{Path, PathBuf};
 use std::process::Command;
-
-fn crate_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn repository_root() -> PathBuf {
-    crate_dir()
-        .join("../..")
-        .canonicalize()
-        .expect("repository root")
-}
-
-fn read(path: &Path) -> Vec<u8> {
-    std::fs::read(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
-}
-
-#[test]
-fn the_crate_copies_of_license_and_notice_are_the_repository_files() {
-    for name in ["LICENSE", "NOTICE"] {
-        assert_eq!(
-            read(&crate_dir().join(name)),
-            read(&repository_root().join(name)),
-            "crates/wesley-json-schema/{name} differs from the repository's {name}"
-        );
-    }
-}
 
 #[test]
 fn the_package_lists_readme_license_and_notice() {
     let output = Command::new(env!("CARGO"))
-        .args([
-            "package",
-            "--list",
-            "--allow-dirty",
-            "--locked",
-            "-p",
-            "wesley-json-schema",
-        ])
-        .current_dir(repository_root())
+        .args(["package", "--list", "--allow-dirty", "--locked"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .expect("cargo package --list runs");
     assert!(

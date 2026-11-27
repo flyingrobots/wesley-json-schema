@@ -11,9 +11,6 @@ homepage = "https://github.com/flyingrobots/wesley-json-schema#readme"
 documentation = "https://docs.rs/wesley-json-schema"
 keywords = ["graphql", "json-schema", "codegen", "wesley"]
 categories = ["compilers", "development-tools", "command-line-utilities"]
-# The package test compares these copies with the repository root, which a
-# published crate does not have.
-exclude = ["tests/package.rs"]
 
 [lib]
 name = "wesley_json_schema"
