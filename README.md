@@ -41,7 +41,7 @@ Rules every change keeps:
 
 ## Releasing
 
-The crate is published to crates.io from an annotated tag by the release workflow, after the owner approves it. [RELEASING.md](RELEASING.md) gives the procedure.
+The crate is published to crates.io from an annotated tag by the release workflow, after the owner approves it. [RELEASING.md](https://github.com/flyingrobots/wesley-json-schema/blob/main/RELEASING.md) gives the procedure.
 
 ## License
 
